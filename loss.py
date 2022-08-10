@@ -19,6 +19,7 @@ class Yolov3Loss(nn.Module):
 
     def forward_step(self, preds, target, anchors):
         # Check where obj and nj (we ignore if target == -1)
+        # create masks for entries with and without object label
         obj = target[..., 0] == 1  # in paper this is Iobj_i
         nj = target[..., 0] == 0  # in paper this is Inoobj_i
 
@@ -36,6 +37,8 @@ class Yolov3Loss(nn.Module):
 
         anchors = anchors.reshape(1, 3, 1, 1, 2)
 
+        # sigmoid(preds[x_c_idx, y_c_idx])
+        # exp(preds[w_idx, h_idx])*anchors -- rescale width and height (I've done this in predict_transform already)
         box_preds = torch.cat([self.sigmoid_function(preds[..., 1:3]), torch.exp(preds[..., 3:5]) * anchors], dim=-1)
         result = intersection_over_union(box_preds[obj], target[..., 1:5][obj]).detach()
 
@@ -47,7 +50,7 @@ class Yolov3Loss(nn.Module):
 
         preds[..., 1:3] = self.sigmoid_function(preds[..., 1:3])  # x,y coordinates
         target[..., 3:5] = torch.log(
-            (1e-16 + target[..., 3:5] / anchors)
+            (1e-16 + target[..., 3:5] / anchors) # divide target w and h by anchors to compare with preds
         )  # width, height coordinates
         box_loss = self.mse(preds[..., 1:5][obj], target[..., 1:5][obj])
 
